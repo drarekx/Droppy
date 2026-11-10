@@ -18,23 +18,56 @@ Droppy se actualiza sola: busca versiones nuevas al arrancar y una vez al día (
 
 Requisitos: macOS 14 (Sonoma) o posterior. Apple Silicon o Intel.
 
-## Qué hace
+## Para qué sirve
 
-- **Abrir una bandeja**
-  - Agitando el ratón mientras arrastras archivos, texto o imágenes desde cualquier app (sensibilidad baja, media o alta).
-  - Pulsando una tecla mientras arrastras (⌃, ⌥ o ⇧; desactivado por defecto).
-  - Con el atajo **⌃⌥D**, desde cualquier app: bandeja vacía donde esté el ratón.
-  - Soltando archivos en el icono de la barra de menús, con «Abrir con» → Droppy, o con el menú **Servicios → Add to Droppy**.
-  - Desde el icono: **Nueva bandeja** o **Nueva bandeja con lo copiado**.
-- **Bandeja fija**: una pestaña fina en el borde de la pantalla (izquierda o derecha; arriba, centro o abajo, en Ajustes). Se abre al pasar el ratón, al arrastrar archivos hasta ella, al agitar el ratón o pulsar la tecla mientras arrastras, o con ⌃⌥D; se desliza desde el borde y queda pegada a él, centrada en vertical. Lo que dejes se queda (aunque lo arrastres a otro sitio) hasta que lo quites tú, y sigue ahí al reiniciar. Se pliega al apartar el ratón, con un clic fuera o con Esc. Con la bandeja fija desactivada, esos gestos abren bandejas flotantes nuevas.
-- **Guardar en la bandeja**: archivos y carpetas (la bandeja solo apunta a ellos, no los copia, y los sigue si se mueven en el Finder), archivos prometidos (adjuntos de Mail, Fotos…), y también texto, imágenes y enlaces, que se guardan como `.txt`, `.png` y `.webloc`. Se pueden tener varias bandejas a la vez; flotan sobre las ventanas y en todos los escritorios.
-- **Sacar de la bandeja**: arrastrar el montón se lleva todos los archivos; «Ver todos» los lista y cada fila (o la selección, con ⌘-clic y ⇧-clic) se arrastra por separado. En el Finder, dentro del mismo disco se **mueven** (⌥ copia, como siempre). Al sacarlos, dejan la bandeja, y la bandeja vacía se cierra (las dos cosas se pueden desactivar).
-- **Ordenar y agrupar** la lista (botón ⇅ o Ajustes): por orden de llegada, nombre, tamaño o tipo, ascendente o descendente, y agrupada por tipo (carpetas, imágenes, PDF, documentos, hojas de cálculo, presentaciones, vídeos, audio, comprimidos, código, apps) con lo que ocupa cada grupo.
-- **Ordenar carpetas por tipo** (icono de la barra de menús → «Ordenar Descargas por tipo…», «Ordenar otra carpeta…», o clic derecho sobre una carpeta de una bandeja): mueve los archivos a subcarpetas con nombre en catalán (`Imatges`, `PDF`, `Documents`, `Fulls de càlcul`, `Presentacions`, `Vídeos`, `Àudio`, `Comprimits`, `Instal·ladors`, `Codi`, `Apps`, `Altres`). Antes se ve qué va a cada una y se eligen los tipos. No toca carpetas, archivos ocultos ni descargas a medias; si el nombre ya existe, pone «nombre 2». **Deshacer** devuelve todo a su sitio. En Ajustes se puede **ordenar automáticamente** la carpeta (Descargas por defecto): solo los archivos que llegan después de activarlo, cuando terminan de descargarse. La primera vez macOS pide permiso para acceder a Descargas.
-- **Acciones** (botón «…» o clic derecho): abrir, vista rápida, mostrar en Finder, copiar, copiar o mover a una carpeta, comprimir en ZIP, compartir, AirDrop, pasar a una bandeja nueva, quitar de la bandeja, mover a la papelera, pegar y vaciar.
+Mover archivos entre carpetas, apps o escritorios suele obligar a tener las dos ventanas a la vista a la vez. Con Droppy no: los dejas en una bandeja, vas a donde tengan que ir y los sueltas allí. Sirve también como sitio de paso para lo que estás reuniendo (las fotos y el presupuesto de un proyecto, lo que vas a adjuntar a un correo…) y para poner orden en Descargas.
+
+## Cómo funciona
+
+### 1. Agita el ratón mientras arrastras: aparece una bandeja
+
+Empieza a arrastrar archivos desde el Finder (o texto, imágenes o enlaces desde cualquier app) y mueve el ratón a izquierda y derecha. Suéltalos en la bandeja: esperan ahí, flotando sobre las ventanas y en todos los escritorios, mientras cambias de carpeta o de app.
+
+<p align="center"><img src="docs/shelf-stack.png" width="256" alt="Bandeja con seis archivos apilados"></p>
+
+Cuando llegues al destino, **arrastra el montón** y te llevas todos los archivos. En el Finder, dentro del mismo disco se **mueven** (con ⌥ se copian, como siempre). Al sacarlos dejan la bandeja, y la bandeja vacía se cierra.
+
+### 2. Uno a uno, ordenados y agrupados
+
+«Ver todos» muestra la lista: cada archivo (o los seleccionados, con ⌘-clic o ⇧-clic) se arrastra por separado. Con el botón ⇅ se ordena por llegada, nombre, tamaño o tipo, y se agrupa por tipo con lo que ocupa cada grupo. Doble clic en la cabecera para **ponerle nombre**.
+
+<p align="center"><img src="docs/shelf-list.png" width="336" alt="Lista de la bandeja agrupada por imágenes, PDF y documentos"></p>
+
+La bandeja solo apunta a los archivos, no los copia, y los sigue si los mueves en el Finder. El botón «…» y el clic derecho tienen el resto: abrir, vista rápida (Espacio), mostrar en Finder, copiar, copiar o mover a una carpeta, comprimir en ZIP, compartir, AirDrop, pasar a otra bandeja, quitar o mover a la papelera.
+
+### 3. La bandeja fija, siempre en el borde
+
+Una pestaña fina en el borde de la pantalla (izquierda o derecha; arriba, centro o abajo). Se abre al pasar el ratón, al arrastrar archivos hasta el borde, al agitar el ratón o con **⌃⌥D**, deslizándose desde el borde. Lo que dejes aquí **se queda** aunque lo arrastres a otro sitio, hasta que lo quites tú. Se pliega al apartar el ratón, con un clic fuera o con Esc.
+
+<p align="center"><img src="docs/fixed-shelf.png" width="306" alt="Bandeja fija abierta en el borde izquierdo"></p>
+
+### 4. Ordenar Descargas (o cualquier carpeta) por tipo
+
+Desde el icono de la barra de menús → «Ordenar Descargas por tipo…», o con clic derecho sobre una carpeta de una bandeja. Antes de mover nada ves qué irá a cada subcarpeta y eliges los tipos. Las subcarpetas se llaman siempre igual, en catalán: `Imatges`, `PDF`, `Documents`, `Fulls de càlcul`, `Presentacions`, `Vídeos`, `Àudio`, `Comprimits`, `Instal·ladors`, `Codi`, `Apps` y `Altres`. No toca carpetas, archivos ocultos ni descargas a medias, y **Deshacer** lo deja todo como estaba.
+
+<p align="center"><img src="docs/organize.png" width="560" alt="Vista previa de ordenar Descargas por tipo"></p>
+
+En Ajustes se puede **ordenar automáticamente**: cada archivo nuevo que llega a la carpeta va a su subcarpeta cuando termina de descargarse. Los que ya estaban no se tocan. La primera vez macOS pide permiso para acceder a Descargas.
+
+### 5. Colores de terminal
+
+Temas clásicos con sus colores oficiales: Solarized (oscuro y claro), Dracula, Nord, Gruvbox, Monokai, One Dark, Tokyo Night, Catppuccin (Mocha y Latte), Rosé Pine, Everforest, Kanagawa y GitHub Dark, además del de Droppy.
+
+<p align="center"><img src="docs/themes.png" width="760" alt="La misma bandeja en Dracula, Solarized Light y Nord"></p>
+<p align="center"><img src="docs/settings-themes.png" width="560" alt="Selector de temas en Ajustes"></p>
+
+## Todo lo que hace
+
+- **Abrir una bandeja**: agitando el ratón mientras arrastras (sensibilidad baja, media o alta); pulsando ⌃, ⌥ o ⇧ mientras arrastras (desactivado por defecto); con **⌃⌥D**; soltando archivos en el icono de la barra de menús; con «Abrir con» → Droppy; con **Servicios → Add to Droppy**; o desde el icono, **Nueva bandeja** o **Nueva bandeja con lo copiado**. Con la bandeja fija activada, agitar, la tecla y ⌃⌥D abren la fija.
+- **Qué se puede dejar**: archivos y carpetas, archivos prometidos (adjuntos de Mail, Fotos…), y texto, imágenes y enlaces, que se guardan como `.txt`, `.png` y `.webloc`. Se pueden tener varias bandejas a la vez.
 - **Teclado** con la bandeja activa: Espacio (vista rápida), ⏎ (abrir), ⌘C, ⌘V, ⌘A, ⌫ (quitar seleccionados), ⌘⌫ (papelera), Esc / ⌘W (cerrar).
-- **Bandejas recientes**: al cerrar una bandeja con archivos se guarda en el menú del icono para reabrirla. Las bandejas abiertas se recuperan al volver a abrir la app.
-- **Abrir al iniciar sesión** e **idiomas** (castellano, inglés y catalán) en Ajustes.
+- **Nada se pierde**: las bandejas abiertas, la fija y las recientes se guardan en cada cambio y vuelven al abrir Droppy. La primera vez que se abre desde Aplicaciones se activa «Abrir al iniciar sesión» (se puede quitar en Ajustes), así que tras reiniciar el Mac vuelven solas. Una bandeja con nombre se guarda aunque esté vacía. Las que cierras con archivos van a «Bandejas recientes» en el menú del icono.
+- **Idiomas**: castellano, inglés y catalán.
 
 ## Dónde guarda las cosas
 
@@ -65,5 +98,5 @@ Con Xcode 16+ el binario es universal (arm64 + x86_64); solo con las Command Lin
 Para publicar una versión nueva, crea y sube una etiqueta; GitHub Actions compila la app y crea el release con el zip:
 
 ```sh
-git tag v1.0.1 && git push origin v1.0.1
+git tag v1.2.1 && git push origin v1.2.1
 ```
