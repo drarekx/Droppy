@@ -237,6 +237,14 @@ private enum Translations {
         "Todos los archivos ya están en subcarpetas.": "Every file is already in a subfolder.",
         "Última ordenación: %d archivos · %@": "Last sort: %d files · %@",
         "1 archivo · %@": "1 file · %@",
+        "Droppy (por defecto)": "Droppy (default)",
+        "Colores de las bandejas": "Shelf colours",
+        "Temas clásicos de editores y terminales, con sus colores oficiales.": "Classic editor and terminal themes, with their official colours.",
+        "Sin nombre": "Untitled",
+        "Doble clic para poner nombre": "Double-click to name it",
+        "Nombre de la bandeja": "Shelf name",
+        "Cambiar el nombre…": "Rename…",
+        "Poner nombre…": "Name…",
     ]
 
     static let ca: [String: String] = [
@@ -416,5 +424,13 @@ private enum Translations {
         "Todos los archivos ya están en subcarpetas.": "Tots els fitxers ja són en subcarpetes.",
         "Última ordenación: %d archivos · %@": "Última ordenació: %d fitxers · %@",
         "1 archivo · %@": "1 fitxer · %@",
+        "Droppy (por defecto)": "Droppy (per defecte)",
+        "Colores de las bandejas": "Colors de les safates",
+        "Temas clásicos de editores y terminales, con sus colores oficiales.": "Temes clàssics d'editors i terminals, amb els seus colors oficials.",
+        "Sin nombre": "Sense nom",
+        "Doble clic para poner nombre": "Doble clic per posar-hi nom",
+        "Nombre de la bandeja": "Nom de la safata",
+        "Cambiar el nombre…": "Canvia el nom…",
+        "Poner nombre…": "Posa-hi nom…",
     ]
 }

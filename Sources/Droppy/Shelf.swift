@@ -54,6 +54,10 @@ final class Shelf: ObservableObject, Identifiable {
     /// The fixed shelf on the left edge of the screen: keeps its files until you remove them.
     let isDocked: Bool
     @Published var items: [ShelfItem]
+    /// Name given by the user. A named shelf is kept even when empty and doesn't close by itself.
+    @Published var name: String?
+    /// The name field in the header is open.
+    @Published var editingName = false
     @Published var selection: Set<UUID> = []
     /// List of every file instead of the stacked preview.
     @Published var expanded = false
@@ -67,10 +71,11 @@ final class Shelf: ObservableObject, Identifiable {
     @Published var contentShown = false
     weak var panel: ShelfPanel?
 
-    init(id: UUID = UUID(), created: Date = Date(), items: [ShelfItem] = [], docked: Bool = false) {
+    init(id: UUID = UUID(), created: Date = Date(), items: [ShelfItem] = [], docked: Bool = false, name: String? = nil) {
         self.id = id
         self.created = created
         self.items = items
+        self.name = name
         isDocked = docked
         expanded = docked
     }
@@ -114,6 +119,18 @@ final class Shelf: ObservableObject, Identifiable {
         default: return tr("%d archivos", items.count)
         }
     }
+
+    var isNamed: Bool { !(name ?? "").trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// Opens the name field; the window has to be key to type in it.
+    func startRenaming() {
+        guard !isDocked else { return }
+        panel?.makeKey()
+        editingName = true
+    }
+
+    /// The user's name, or a description of the files.
+    var displayName: String { isNamed ? name! : title }
 
     var totalBytes: Int64 { items.reduce(0) { $0 + FileInfo.size(of: $1.url) } }
 

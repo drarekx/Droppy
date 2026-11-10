@@ -140,6 +140,13 @@ struct ShelfMenuContent: View {
             }
         }
         Divider()
+        if !shelf.isDocked {
+            Button {
+                shelf.startRenaming()
+            } label: {
+                Label(shelf.isNamed ? tr("Cambiar el nombre…") : tr("Poner nombre…"), systemImage: "pencil")
+            }
+        }
         Button {
             Importer.add(from: .general, to: shelf)
         } label: {

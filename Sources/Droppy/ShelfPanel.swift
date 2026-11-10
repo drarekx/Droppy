@@ -33,7 +33,7 @@ final class ShelfPanel: NSPanel, NSWindowDelegate, QLPreviewPanelDataSource, QLP
         backgroundColor = .clear
         hasShadow = true
         isMovableByWindowBackground = false
-        appearance = NSAppearance(named: .darkAqua)
+        appearance = NSAppearance(named: Settings.shared.shelfTheme.palette.isLight ? .aqua : .darkAqua)
         animationBehavior = .utilityWindow
         delegate = self
 
@@ -42,7 +42,7 @@ final class ShelfPanel: NSPanel, NSWindowDelegate, QLPreviewPanelDataSource, QLP
         container.layer?.cornerRadius = 16
         container.layer?.cornerCurve = .continuous
         container.layer?.masksToBounds = true
-        let hosting = NSHostingView(rootView: ShelfView(shelf: shelf))
+        let hosting = NSHostingView(rootView: ThemedShelfView(shelf: shelf))
         // The window decides its size. With Auto Layout (or SwiftUI sizing), SwiftUI's minimum
         // sizes resize and move the window: the docked shelf stayed 252×268 instead of its
         // 8×72 tab, and opened 252×529 at the top instead of 260×340, centred.
@@ -54,6 +54,11 @@ final class ShelfPanel: NSPanel, NSWindowDelegate, QLPreviewPanelDataSource, QLP
         container.addSubview(hosting)
         contentView = container
         shelf.panel = self
+
+        // Light themes need a light appearance, so menus and controls match.
+        Settings.shared.$shelfTheme.dropFirst().sink { [weak self] theme in
+            DispatchQueue.main.async { self?.appearance = NSAppearance(named: theme.palette.isLight ? .aqua : .darkAqua) }
+        }.store(in: &cancellables)
 
         if shelf.isDocked {
             collectionBehavior.insert(.stationary)

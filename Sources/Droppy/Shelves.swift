@@ -14,7 +14,7 @@ final class Shelves: ObservableObject {
     private(set) var docked = Shelf(docked: true)
 
     private var panels: [UUID: ShelfPanel] = [:]
-    private var observers: [UUID: AnyCancellable] = [:]
+    private var observers: [UUID: [AnyCancellable]] = [:]
     private var saveScheduled = false
     private var refreshTimer: Timer?
 
@@ -46,9 +46,9 @@ final class Shelves: ObservableObject {
                 docked.refresh()
                 continue
             }
-            let shelf = Shelf(id: entry.id, created: entry.created, items: entry.items)
+            let shelf = Shelf(id: entry.id, created: entry.created, items: entry.items, name: entry.name)
             shelf.refresh()
-            guard !shelf.items.isEmpty else { removeClips(of: shelf); continue }
+            guard !shelf.items.isEmpty || shelf.isNamed else { removeClips(of: shelf); continue }
             if entry.open {
                 show(shelf, at: entry.origin.map { NSPoint(x: $0.x, y: $0.y) }, centered: false)
             } else {
@@ -88,7 +88,7 @@ final class Shelves: ObservableObject {
 
     /// Shelf for a drag that is in progress: reuses an empty open shelf, else makes one.
     func shelfForDrag(at point: NSPoint) {
-        if let empty = open.last(where: { $0.items.isEmpty }), let panel = panels[empty.id] {
+        if let empty = open.last(where: { $0.items.isEmpty && !$0.isNamed }), let panel = panels[empty.id] {
             panel.place(centeredOn: point)
             panel.orderFrontRegardless()
             return
@@ -164,7 +164,7 @@ final class Shelves: ObservableObject {
         panels.removeValue(forKey: shelf.id)?.animateOut()
         open.removeAll { $0.id == shelf.id }
         shelf.selection = []
-        if shelf.items.isEmpty || !Settings.shared.keepRecent {
+        if (shelf.items.isEmpty && !shelf.isNamed) || !Settings.shared.keepRecent {
             discard(shelf)
         } else {
             recent.removeAll { $0.id == shelf.id }
@@ -181,7 +181,7 @@ final class Shelves: ObservableObject {
 
     func reopen(_ shelf: Shelf) {
         shelf.refresh()
-        guard !shelf.items.isEmpty else {
+        guard !shelf.items.isEmpty || shelf.isNamed else {
             recent.removeAll { $0.id == shelf.id }
             discard(shelf)
             scheduleSave()
@@ -216,10 +216,13 @@ final class Shelves: ObservableObject {
     // MARK: - Persistence
 
     private func observe(_ shelf: Shelf) {
-        observers[shelf.id] = shelf.$items.dropFirst().sink { [weak self, weak shelf] items in
+        let names = shelf.$name.dropFirst().sink { [weak self] _ in
+            MainActor.assumeIsolated { self?.scheduleSave() }
+        }
+        let items = shelf.$items.dropFirst().sink { [weak self, weak shelf] items in
             MainActor.assumeIsolated {
                 guard let self, let shelf else { return }
-                if !shelf.isDocked, items.isEmpty, Settings.shared.closeWhenEmpty, self.panels[shelf.id] != nil,
+                if !shelf.isDocked, !shelf.isNamed, items.isEmpty, Settings.shared.closeWhenEmpty, self.panels[shelf.id] != nil,
                    !shelf.isTargeted, shelf.busy == nil {
                     // Let the drag-out animation finish first.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -229,6 +232,7 @@ final class Shelves: ObservableObject {
                 self.scheduleSave()
             }
         }
+        observers[shelf.id] = [names, items]
     }
 
     func scheduleSave() {
@@ -241,15 +245,16 @@ final class Shelves: ObservableObject {
     }
 
     func save() {
-        var stored = open.filter { !$0.items.isEmpty }.map { shelf in
+        // Empty shelves are kept only if they have a name.
+        var stored = open.filter { !$0.items.isEmpty || $0.isNamed }.map { shelf in
             StoredShelf(id: shelf.id, created: shelf.created, items: shelf.items, open: true,
                         origin: panels[shelf.id].map { StoredShelf.Point(x: $0.frame.minX, y: $0.frame.minY) },
-                        docked: nil)
+                        docked: nil, name: shelf.name)
         }
         stored.insert(StoredShelf(id: docked.id, created: docked.created, items: docked.items,
-                                  open: false, origin: nil, docked: true), at: 0)
+                                  open: false, origin: nil, docked: true, name: nil), at: 0)
         stored += recent.map {
-            StoredShelf(id: $0.id, created: $0.created, items: $0.items, open: false, origin: nil, docked: nil)
+            StoredShelf(id: $0.id, created: $0.created, items: $0.items, open: false, origin: nil, docked: nil, name: $0.name)
         }
         do {
             try FileManager.default.createDirectory(at: Self.supportDirectory, withIntermediateDirectories: true)
@@ -270,5 +275,6 @@ final class Shelves: ObservableObject {
         let origin: Point?
         /// Optional so older files still decode.
         let docked: Bool?
+        let name: String?
     }
 }

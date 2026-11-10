@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ServiceManagement
 import SwiftUI
 
 /// App identity shared by the updater, menus and storage.
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             .store(in: &cancellables)
 
         Shelves.shared.load()
+        enableLaunchAtLoginOnce()
         Organizer.shared.load()
         // Turning automatic sorting on (or changing its folder) only affects files that arrive from now on.
         Settings.shared.$autoOrganize
@@ -80,6 +82,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
                     let plan = Organizer.plan(folder: folder, excluded: Settings.shared.organizeExcluded)
                     Task { await Organizer.shared.organize(plan.entries, in: folder) }
                 case "organize-undo": Task { _ = await Organizer.shared.undoLast() }
+                case "settings": (NSApp.delegate as? AppDelegate)?.showSettings()
+                case "new": Shelves.shared.newShelf(at: NSPoint(x: 700, y: 500))
+                case let command? where command.hasPrefix("floating-dir:"), let command? where command.hasPrefix("dock-dir:"):
+                    let isDock = command.hasPrefix("dock-dir:")
+                    let folder = URL(fileURLWithPath: String(command.drop(while: { $0 != ":" }).dropFirst()))
+                    let urls = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil,
+                                                                              options: .skipsHiddenFiles)) ?? [])
+                        .sorted { $0.lastPathComponent < $1.lastPathComponent }
+                    if isDock { Shelves.shared.docked.add(urls) } else { Shelves.shared.newShelf(with: urls, at: NSPoint(x: 700, y: 500)) }
+                case "clear-dock": Shelves.shared.docked.items = []
+                case "rename": Shelves.shared.open.last?.startRenaming()
+                case let command? where command.hasPrefix("name:"): Shelves.shared.open.last?.name = String(command.dropFirst(5))
+                case let command? where command.hasPrefix("theme:"):
+                    if let theme = ShelfTheme(rawValue: String(command.dropFirst(6))) { Settings.shared.shelfTheme = theme }
                 default: break
                 }
             }
@@ -98,6 +114,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             Shelves.shared.newShelf(with: pendingOpen)
             pendingOpen = []
         }
+    }
+
+    /// Shelves come back after a restart only if Droppy opens at login: turn it on once,
+    /// on the first launch of an installed copy. Turning it off in Settings is respected.
+    /// Only from an installed copy (Applications), never from a build folder.
+    /// `-droppyUnregisterLoginItem YES` (launch argument) removes the login item, for development.
+    private func enableLaunchAtLoginOnce() {
+        if UserDefaults.standard.bool(forKey: "droppyUnregisterLoginItem") {
+            try? SMAppService.mainApp.unregister()
+            return
+        }
+        let key = "launchAtLoginDefaultApplied"
+        let path = Bundle.main.bundleURL.path
+        let installed = path.hasPrefix("/Applications/") || path.hasPrefix(NSHomeDirectory() + "/Applications/")
+        guard Bundle.main.bundleIdentifier != nil, installed, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -208,7 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             formatter.locale = Localizer.shared.locale
             formatter.unitsStyle = .short
             for shelf in shelves.recent {
-                let title = "\(shelf.title) · \(formatter.localizedString(for: shelf.created, relativeTo: Date()))"
+                let title = "\(shelf.displayName) · \(formatter.localizedString(for: shelf.created, relativeTo: Date()))"
                 let entry = ClosureMenuItem(title: title) { shelves.reopen(shelf) }
                 if let first = shelf.items.first {
                     let icon = NSWorkspace.shared.icon(forFile: first.url.path)

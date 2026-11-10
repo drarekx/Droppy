@@ -3,6 +3,7 @@ import SwiftUI
 
 /// Content of a shelf window: header, the files (stacked or as a list) and a footer.
 struct ShelfView: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
 
     @ObservedObject private var settings = Settings.shared
@@ -52,7 +53,7 @@ struct ShelfView: View {
         .clipShape(shape)
         .overlay {
             shape
-                .strokeBorder(shelf.isTargeted ? Theme.accent : Color.white.opacity(0.10),
+                .strokeBorder(shelf.isTargeted ? palette.accent : palette.text.opacity(0.10),
                               lineWidth: shelf.isTargeted ? 2 : 1)
         }
         .animation(.easeOut(duration: 0.15), value: shelf.isTargeted)
@@ -79,10 +80,12 @@ func shelfDragEnded(_ shelf: Shelf, urls: [URL], operation: NSDragOperation) {
 // MARK: - Parts
 
 private struct ShelfBackground: View {
+    @Environment(\.shelfPalette) private var palette
+
     var body: some View {
         ZStack {
-            VisualEffect(material: .hudWindow)
-            Theme.window.opacity(0.55)
+            VisualEffect(material: palette.isLight ? .popover : .hudWindow)
+            palette.background.opacity(0.9)
         }
     }
 }
@@ -98,10 +101,11 @@ private struct VisualEffect: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ view: NSVisualEffectView, context: Context) { view.material = material }
 }
 
 private struct ShelfHeader: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
 
     var body: some View {
@@ -111,22 +115,35 @@ private struct ShelfHeader: View {
             } label: {
                 Image(systemName: shelf.isDocked ? "chevron.left" : "xmark")
                     .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Theme.text2)
+                    .foregroundStyle(palette.text2)
                     .frame(width: 18, height: 18)
-                    .background(Color.white.opacity(0.08), in: Circle())
+                    .background(palette.text.opacity(0.08), in: Circle())
             }
             .buttonStyle(.plain)
             .help(shelf.isDocked ? tr("Plegar (Esc)") : tr("Cerrar bandeja (Esc)"))
 
             Spacer(minLength: 0)
+            if !shelf.isDocked {
+                if shelf.editingName {
+                    ShelfNameField(shelf: shelf)
+                } else {
+                    Text(shelf.isNamed ? shelf.name! : tr("Sin nombre"))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(shelf.isNamed ? palette.text2 : palette.text3.opacity(0.7))
+                        .lineLimit(1).truncationMode(.tail)
+                        // Clicks go to the drag handle behind: drag moves, double-click renames.
+                        .allowsHitTesting(false)
+                }
+                Spacer(minLength: 0)
+            }
             if shelf.isDocked {
                 Label(tr("Bandeja fija"), systemImage: "pin.fill")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.text2)
+                    .foregroundStyle(palette.text2)
                 if !shelf.items.isEmpty {
                     Text("\(shelf.items.count)")
                         .font(.system(size: 10, weight: .bold)).monospacedDigit()
-                        .foregroundStyle(Theme.text3)
+                        .foregroundStyle(palette.text3)
                 }
                 Spacer(minLength: 0)
             }
@@ -135,9 +152,9 @@ private struct ShelfHeader: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.text2)
+                    .foregroundStyle(palette.text2)
                     .frame(width: 22, height: 18)
-                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .background(palette.text.opacity(0.08), in: Capsule())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
@@ -146,22 +163,63 @@ private struct ShelfHeader: View {
         }
         .padding(.horizontal, 10)
         .frame(height: 30)
-        .background(WindowDragHandle())
+        .background(WindowDragHandle(onDoubleClick: shelf.isDocked ? nil : { shelf.startRenaming() }))
+        .help(shelf.isDocked ? "" : tr("Doble clic para poner nombre"))
+    }
+}
+
+/// Inline name editor in the header. Return or clicking elsewhere saves, Esc cancels.
+private struct ShelfNameField: View {
+    @ObservedObject var shelf: Shelf
+    @Environment(\.shelfPalette) private var palette
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField(tr("Nombre de la bandeja"), text: $draft)
+            .textFieldStyle(.plain)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(palette.text)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 6)
+            .frame(height: 20)
+            .background(palette.text.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+            .focused($focused)
+            .onAppear {
+                draft = shelf.name ?? ""
+                DispatchQueue.main.async { focused = true }
+            }
+            .onSubmit(commit)
+            .onExitCommand { shelf.editingName = false }
+            .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+    }
+
+    private func commit() {
+        guard shelf.editingName else { return }
+        let name = draft.trimmingCharacters(in: .whitespaces)
+        shelf.name = name.isEmpty ? nil : name
+        shelf.editingName = false
     }
 }
 
 /// Dragging here moves the window (the rest of the shelf drags files).
 private struct WindowDragHandle: NSViewRepresentable {
+    var onDoubleClick: (() -> Void)?
+
     final class HandleView: NSView {
-        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+        var onDoubleClick: (() -> Void)?
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2, let onDoubleClick { onDoubleClick() } else { window?.performDrag(with: event) }
+        }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     }
 
     func makeNSView(context: Context) -> HandleView { HandleView() }
-    func updateNSView(_ view: HandleView, context: Context) {}
+    func updateNSView(_ view: HandleView, context: Context) { view.onDoubleClick = onDoubleClick }
 }
 
 private struct EmptyShelf: View {
+    @Environment(\.shelfPalette) private var palette
     let targeted: Bool
     var docked = false
 
@@ -169,14 +227,14 @@ private struct EmptyShelf: View {
         VStack(spacing: 10) {
             Image(systemName: targeted ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
                 .font(.system(size: 34, weight: .light))
-                .foregroundStyle(targeted ? Theme.accentText : Theme.text3)
+                .foregroundStyle(targeted ? palette.accent : palette.text3)
             Text(targeted ? tr("Suelta para guardar") : tr("Suelta archivos aquí"))
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(targeted ? Theme.text : Theme.text2)
+                .foregroundStyle(targeted ? palette.text : palette.text2)
             Text(docked ? tr("Lo que dejes aquí se queda hasta que lo quites.")
                         : tr("Esperarán aquí hasta que los arrastres a su destino."))
                 .font(.system(size: 10.5))
-                .foregroundStyle(Theme.text3)
+                .foregroundStyle(palette.text3)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -188,6 +246,7 @@ private struct EmptyShelf: View {
 
 /// Collapsed shelf: a pile of the first files. Dragging it takes every file.
 private struct ShelfStack: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
 
     var body: some View {
@@ -203,11 +262,11 @@ private struct ShelfStack: View {
                 if shelf.items.count > 1 {
                     Text("\(shelf.items.count)")
                         .font(.system(size: 12, weight: .bold)).monospacedDigit()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(palette.onAccent)
                         .padding(.horizontal, 7)
                         .frame(minWidth: 22, minHeight: 22)
-                        .background(Theme.accentFill, in: Capsule())
-                        .overlay { Capsule().strokeBorder(Color.white.opacity(0.25)) }
+                        .background(palette.accent, in: Capsule())
+                        .overlay { Capsule().strokeBorder(palette.text.opacity(0.25)) }
                         .offset(x: 46, y: -40)
                 }
             }
@@ -216,11 +275,11 @@ private struct ShelfStack: View {
             VStack(spacing: 2) {
                 Text(shelf.title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1).truncationMode(.middle)
                 Text(shelf.items.count == 1 ? FileInfo.detail(of: shelf.items[0].url) : Format.bytes(shelf.totalBytes))
                     .font(.system(size: 11)).monospacedDigit()
-                    .foregroundStyle(Theme.text3)
+                    .foregroundStyle(palette.text3)
             }
             .padding(.horizontal, 12)
         }
@@ -239,6 +298,7 @@ private struct ShelfStack: View {
 
 /// Expanded shelf: one row per file; each row (or the selection) can be dragged on its own.
 private struct ShelfList: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
     @ObservedObject private var settings = Settings.shared
 
@@ -251,13 +311,13 @@ private struct ShelfList: View {
                             Image(systemName: group.category.symbol)
                             Text(group.category.title.uppercased())
                                 .tracking(0.5)
-                            Text("\(group.items.count)").foregroundStyle(Theme.text3.opacity(0.7))
+                            Text("\(group.items.count)").foregroundStyle(palette.text3.opacity(0.7))
                             Spacer()
                             let bytes = group.items.reduce(0) { $0 + FileInfo.size(of: $1.url) }
                             if bytes > 0 { Text(Format.bytes(bytes)) }
                         }
                         .font(.system(size: 10, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(Theme.text3)
+                        .foregroundStyle(palette.text3)
                         .padding(.horizontal, 8)
                         .padding(.top, 8)
                         .padding(.bottom, 2)
@@ -279,6 +339,7 @@ private struct ShelfList: View {
 }
 
 private struct ShelfRow: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
     let item: ShelfItem
     let selected: Bool
@@ -290,11 +351,11 @@ private struct ShelfRow: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name)
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(palette.text)
                     .lineLimit(1).truncationMode(.middle)
                 Text(FileInfo.detail(of: item.url))
                     .font(.system(size: 10.5)).monospacedDigit()
-                    .foregroundStyle(Theme.text3)
+                    .foregroundStyle(palette.text3)
             }
             Spacer(minLength: 0)
             if hovering {
@@ -303,7 +364,7 @@ private struct ShelfRow: View {
                 } label: {
                     Image(systemName: "minus.circle.fill")
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.text3)
+                        .foregroundStyle(palette.text3)
                 }
                 .buttonStyle(.plain)
                 .help(tr("Quitar de la bandeja"))
@@ -312,7 +373,7 @@ private struct ShelfRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(selected ? Theme.navSelected : (hovering ? Color.white.opacity(0.05) : .clear),
+        .background(selected ? palette.selection : (hovering ? palette.text.opacity(0.05) : .clear),
                     in: RoundedRectangle(cornerRadius: 7))
         .overlay {
             // Leaves room for the remove button on the right.
@@ -331,6 +392,7 @@ private struct ShelfRow: View {
 }
 
 private struct ShelfFooter: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
 
     var body: some View {
@@ -343,8 +405,13 @@ private struct ShelfFooter: View {
                     Label(shelf.expanded ? tr("Agrupar") : tr("Ver todos"),
                           systemImage: shelf.expanded ? "square.stack" : "list.bullet")
                         .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(palette.text2)
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
+                        .background(palette.text.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(AppButtonStyle(kind: .ghost, height: 24))
+                .buttonStyle(.plain)
             }
             if shelf.expanded {
                 SortMenu()
@@ -364,9 +431,9 @@ private struct ShelfFooter: View {
         } label: {
             Image(systemName: action.symbol)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.text2)
+                .foregroundStyle(palette.text2)
                 .frame(width: 28, height: 24)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
+                .background(palette.text.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -376,6 +443,7 @@ private struct ShelfFooter: View {
 
 /// Order and grouping of the list (shared by every shelf).
 private struct SortMenu: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject private var settings = Settings.shared
 
     var body: some View {
@@ -390,9 +458,9 @@ private struct SortMenu: View {
         } label: {
             Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.text2)
+                .foregroundStyle(palette.text2)
                 .frame(width: 28, height: 24)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
+                .background(palette.text.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -404,16 +472,17 @@ private struct SortMenu: View {
 /// Docked shelf folded on the screen edge: a thin tab with the file count.
 /// Fixed shelf folded on the screen edge: a thin, quiet strip; a dot shows it holds files.
 private struct DockTab: View {
+    @Environment(\.shelfPalette) private var palette
     @ObservedObject var shelf: Shelf
 
     var body: some View {
         ZStack {
-            (shelf.isTargeted ? Theme.accentFill : Color.white.opacity(0.22))
+            (shelf.isTargeted ? palette.accent : palette.text.opacity(0.22))
             if !shelf.items.isEmpty && !shelf.isTargeted {
-                Circle().fill(Theme.accentText).frame(width: 4, height: 4)
+                Circle().fill(palette.accent).frame(width: 4, height: 4)
             }
         }
-        .overlay { dockShape(docked: true, radius: 4).strokeBorder(Color.black.opacity(0.25), lineWidth: 0.5) }
+        .overlay { dockShape(docked: true, radius: 4).strokeBorder(palette.background.opacity(0.6), lineWidth: 0.5) }
         .help(tr("Bandeja fija: pasa el ratón o arrastra archivos hasta aquí"))
     }
 }
@@ -431,14 +500,15 @@ func dockShape(docked: Bool, radius: CGFloat) -> UnevenRoundedRectangle {
 }
 
 private struct BusyOverlay: View {
+    @Environment(\.shelfPalette) private var palette
     let text: String
 
     var body: some View {
         VStack(spacing: 8) {
             ProgressView().controlSize(.small)
-            Text(text).font(.system(size: 11)).foregroundStyle(Theme.text2)
+            Text(text).font(.system(size: 11)).foregroundStyle(palette.text2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.window.opacity(0.75))
+        .background(palette.background.opacity(0.85))
     }
 }

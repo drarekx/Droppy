@@ -17,6 +17,23 @@ struct SettingsPane: View {
 
                 HowItWorksCard()
 
+                VStack(alignment: .leading, spacing: 12) {
+                    SectionLabel(tr("Colores de las bandejas"))
+                    Text(tr("Temas clásicos de editores y terminales, con sus colores oficiales."))
+                        .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 108), spacing: 12)], spacing: 14) {
+                        ForEach(ShelfTheme.allCases) { theme in
+                            Button { settings.shelfTheme = theme } label: {
+                                ShelfThemeSwatch(theme: theme, selected: settings.shelfTheme == theme)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(theme.name)
+                        }
+                    }
+                }
+                .appCard()
+
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel(tr("Abrir una bandeja"))
                     SwitchRow(title: tr("Agitar el ratón al arrastrar"),

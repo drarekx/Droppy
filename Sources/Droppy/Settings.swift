@@ -62,9 +62,9 @@ enum TriggerModifier: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .none: return tr("Ninguna")
-        case .control: return "⌃ Control"
-        case .option: return "⌥ Option"
-        case .shift: return "⇧ Shift"
+        case .control: return "⌃"
+        case .option: return "⌥"
+        case .shift: return "⇧"
         }
     }
 
@@ -99,6 +99,8 @@ final class Settings: ObservableObject {
     @Published var dockEnabled: Bool { didSet { defaults.set(dockEnabled, forKey: "dockEnabled") } }
     @Published var dockEdge: DockEdge { didSet { defaults.set(dockEdge.rawValue, forKey: "dockEdge") } }
     @Published var dockAlignment: DockAlignment { didSet { defaults.set(dockAlignment.rawValue, forKey: "dockAlignment") } }
+    /// Colour theme of every shelf.
+    @Published var shelfTheme: ShelfTheme { didSet { defaults.set(shelfTheme.rawValue, forKey: "shelfTheme") } }
     @Published var sort: ShelfSort { didSet { defaults.set(sort.rawValue, forKey: "shelfSort") } }
     @Published var sortDescending: Bool { didSet { defaults.set(sortDescending, forKey: "sortDescending") } }
     /// List sections per kind of file (Images, PDFs…).
@@ -134,6 +136,7 @@ final class Settings: ObservableObject {
         dockEnabled = defaults.bool(forKey: "dockEnabled")
         dockEdge = DockEdge(rawValue: defaults.string(forKey: "dockEdge") ?? "") ?? .left
         dockAlignment = DockAlignment(rawValue: defaults.string(forKey: "dockAlignment") ?? "") ?? .center
+        shelfTheme = ShelfTheme(rawValue: defaults.string(forKey: "shelfTheme") ?? "") ?? .droppy
         sort = ShelfSort(rawValue: defaults.string(forKey: "shelfSort") ?? "") ?? .added
         sortDescending = defaults.bool(forKey: "sortDescending")
         groupByKind = defaults.bool(forKey: "groupByKind")
