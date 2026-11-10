@@ -132,11 +132,25 @@ final class Shelves: ObservableObject {
     }
 
     /// Opens the docked shelf (mouse over it, or a drag reaching the screen edge).
-    func revealDock() {
-        guard Settings.shared.dockEnabled, !docked.revealed else { return }
+    /// `sticky`: opened by a shortcut, the shake or the menu rather than the mouse over the tab.
+    func revealDock(sticky: Bool = false) {
+        guard Settings.shared.dockEnabled else { return }
+        if sticky { dockPanel?.waitsForVisit = true }
+        guard !docked.revealed else { return }
         docked.revealed = true
         dockPanel?.orderFrontRegardless()
         dockPanel?.scheduleDockCollapse()
+    }
+
+    func toggleDock() {
+        if docked.revealed { docked.revealed = false } else { revealDock(sticky: true) }
+    }
+
+    /// A click in another app folds the open docked shelf.
+    func dockClickedOutside(at point: NSPoint) {
+        guard docked.revealed, let panel = dockPanel, !panel.frame.contains(point) else { return }
+        panel.waitsForVisit = false
+        docked.revealed = false
     }
 
     var dockPanel: ShelfPanel? { panels[docked.id] }

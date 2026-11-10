@@ -5,18 +5,27 @@ import SwiftUI
 struct ShelfView: View {
     @ObservedObject var shelf: Shelf
 
+    @ObservedObject private var settings = Settings.shared
+
     var body: some View {
-        if shelf.isDocked, !shelf.revealed {
-            DockTab(shelf: shelf)
+        if shelf.isDocked {
+            let left = settings.dockEdge == .left
+            ZStack(alignment: left ? .leading : .trailing) {
+                if shelf.contentShown {
+                    content.transition(.move(edge: left ? .leading : .trailing))
+                } else if !shelf.revealed {
+                    DockTab(shelf: shelf)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             content
         }
     }
 
+    /// Docked: square on the screen edge, rounded on the other side.
     private var shape: some InsettableShape {
-        UnevenRoundedRectangle(topLeadingRadius: shelf.isDocked ? 0 : 16, bottomLeadingRadius: shelf.isDocked ? 0 : 16,
-                               bottomTrailingRadius: shelf.isDocked ? 14 : 16, topTrailingRadius: shelf.isDocked ? 14 : 16,
-                               style: .continuous)
+        dockShape(docked: shelf.isDocked, radius: shelf.isDocked ? 14 : 16)
     }
 
     private var content: some View {
@@ -40,6 +49,7 @@ struct ShelfView: View {
             }
         }
         .background(ShelfBackground())
+        .clipShape(shape)
         .overlay {
             shape
                 .strokeBorder(shelf.isTargeted ? Theme.accent : Color.white.opacity(0.10),
@@ -163,7 +173,7 @@ private struct EmptyShelf: View {
             Text(targeted ? tr("Suelta para guardar") : tr("Suelta archivos aquí"))
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(targeted ? Theme.text : Theme.text2)
-            Text(docked ? tr("Lo que dejes aquí se queda hasta que lo quites. Ábrela llevando el ratón al borde izquierdo.")
+            Text(docked ? tr("Lo que dejes aquí se queda hasta que lo quites.")
                         : tr("Esperarán aquí hasta que los arrastres a su destino."))
                 .font(.system(size: 10.5))
                 .foregroundStyle(Theme.text3)
@@ -243,7 +253,8 @@ private struct ShelfList: View {
                                 .tracking(0.5)
                             Text("\(group.items.count)").foregroundStyle(Theme.text3.opacity(0.7))
                             Spacer()
-                            Text(Format.bytes(group.items.reduce(0) { $0 + FileInfo.size(of: $1.url) }))
+                            let bytes = group.items.reduce(0) { $0 + FileInfo.size(of: $1.url) }
+                            if bytes > 0 { Text(Format.bytes(bytes)) }
                         }
                         .font(.system(size: 10, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(Theme.text3)
@@ -351,10 +362,14 @@ private struct ShelfFooter: View {
         Button {
             action.perform(on: shelf.actionTargets, in: shelf)
         } label: {
-            Image(systemName: action.symbol).font(.system(size: 11, weight: .medium))
+            Image(systemName: action.symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.text2)
+                .frame(width: 28, height: 24)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: Theme.radius))
+                .contentShape(Rectangle())
         }
-        .buttonStyle(AppButtonStyle(kind: .ghost, height: 24))
-        .frame(width: 30)
+        .buttonStyle(.plain)
         .help(action.title)
     }
 }
@@ -387,28 +402,32 @@ private struct SortMenu: View {
 }
 
 /// Docked shelf folded on the screen edge: a thin tab with the file count.
+/// Fixed shelf folded on the screen edge: a thin, quiet strip; a dot shows it holds files.
 private struct DockTab: View {
     @ObservedObject var shelf: Shelf
 
     var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: shelf.isTargeted ? "tray.and.arrow.down.fill" : "tray.fill")
-                .font(.system(size: 9, weight: .semibold))
-            if !shelf.items.isEmpty {
-                Text("\(shelf.items.count)")
-                    .font(.system(size: 9, weight: .bold)).monospacedDigit()
-                    .minimumScaleFactor(0.6)
+        ZStack {
+            (shelf.isTargeted ? Theme.accentFill : Color.white.opacity(0.22))
+            if !shelf.items.isEmpty && !shelf.isTargeted {
+                Circle().fill(Theme.accentText).frame(width: 4, height: 4)
             }
         }
-        .foregroundStyle(shelf.isTargeted ? Color.white : Theme.text2)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(shelf.isTargeted ? Theme.accentFill : Theme.control.opacity(0.92))
-        .overlay {
-            UnevenRoundedRectangle(bottomTrailingRadius: 14, topTrailingRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12))
-        }
+        .overlay { dockShape(docked: true, radius: 4).strokeBorder(Color.black.opacity(0.25), lineWidth: 0.5) }
         .help(tr("Bandeja fija: pasa el ratón o arrastra archivos hasta aquí"))
     }
+}
+
+/// Rounded on the side away from the screen edge when docked; all round otherwise.
+@MainActor
+func dockShape(docked: Bool, radius: CGFloat) -> UnevenRoundedRectangle {
+    guard docked else { return UnevenRoundedRectangle(cornerRadii: .init(topLeading: radius, bottomLeading: radius,
+                                                                       bottomTrailing: radius, topTrailing: radius),
+                                                      style: .continuous) }
+    let left = Settings.shared.dockEdge == .left
+    return UnevenRoundedRectangle(topLeadingRadius: left ? 0 : radius, bottomLeadingRadius: left ? 0 : radius,
+                                  bottomTrailingRadius: left ? radius : 0, topTrailingRadius: left ? radius : 0,
+                                  style: .continuous)
 }
 
 private struct BusyOverlay: View {

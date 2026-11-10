@@ -63,6 +63,8 @@ final class Shelf: ObservableObject, Identifiable {
     @Published var busy: String?
     /// Docked shelf only: open (true) or folded into a tab at the screen edge.
     @Published var revealed = false
+    /// Docked shelf only: the open shelf is on screen (slides in after the window grows, out before it shrinks).
+    @Published var contentShown = false
     weak var panel: ShelfPanel?
 
     init(id: UUID = UUID(), created: Date = Date(), items: [ShelfItem] = [], docked: Bool = false) {

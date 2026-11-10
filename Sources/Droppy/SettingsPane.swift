@@ -44,7 +44,7 @@ struct SettingsPane: View {
                     .padding(.vertical, 8)
                     Divider().overlay(Theme.line)
                     SwitchRow(title: tr("Atajo de teclado %@", HotKey.display),
-                              detail: tr("Abre una bandeja vacía donde esté el ratón, desde cualquier app."),
+                              detail: tr("Abre o pliega la bandeja fija desde cualquier app (sin bandeja fija, abre una bandeja nueva donde esté el ratón)."),
                               isOn: $settings.hotKeyEnabled)
                     Text(tr("También: suelta archivos en el icono de la barra de menús, usa «Abrir con» → %@ o el menú Servicios → «Add to Droppy».", AppInfo.name))
                         .font(.system(size: 11)).foregroundStyle(Theme.text3)
@@ -54,9 +54,23 @@ struct SettingsPane: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     SectionLabel(tr("Bandeja fija"))
-                    SwitchRow(title: tr("Bandeja fija en el borde izquierdo"),
-                              detail: tr("Una pestaña en el borde izquierdo de la pantalla. Se abre al pasar el ratón o al arrastrar archivos hasta el borde, y lo que dejes se queda hasta que lo quites."),
+                    SwitchRow(title: tr("Bandeja fija en el borde de la pantalla"),
+                              detail: tr("Una pestaña fina en el borde. Se abre al pasar el ratón o al arrastrar archivos hasta ella, y lo que dejes se queda hasta que lo quites."),
                               isOn: $settings.dockEnabled)
+                    HStack {
+                        Text(tr("Lado"))
+                        Spacer()
+                        SegmentedControl(options: DockEdge.allCases.map { ($0.title, $0) }, selection: $settings.dockEdge)
+                    }
+                    .padding(.vertical, 4)
+                    .disabled(!settings.dockEnabled)
+                    HStack {
+                        Text(tr("Posición"))
+                        Spacer()
+                        SegmentedControl(options: DockAlignment.allCases.map { ($0.title, $0) }, selection: $settings.dockAlignment)
+                    }
+                    .padding(.vertical, 4)
+                    .disabled(!settings.dockEnabled)
                     Divider().overlay(Theme.line)
                     HStack {
                         Text(tr("Ordenar por"))
@@ -89,6 +103,8 @@ struct SettingsPane: View {
                     }
                 }
                 .appCard()
+
+                OrganizeSettingsCard()
 
                 VStack(alignment: .leading, spacing: 10) {
                     SectionLabel(tr("Idioma"))
@@ -147,6 +163,55 @@ struct SettingsPane: View {
             loginError = tr("No se pudo cambiar: %@", error.localizedDescription)
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+}
+
+/// Sorting a folder (Downloads by default) into subfolders by kind.
+private struct OrganizeSettingsCard: View {
+    @ObservedObject private var settings = Settings.shared
+    @ObservedObject private var organizer = Organizer.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(tr("Ordenar carpetas por tipo"))
+            Text(tr("Mueve los archivos de una carpeta a subcarpetas según su tipo: Imatges, PDF, Documents, Vídeos, Instal·ladors… Se puede deshacer."))
+                .font(.system(size: 12)).foregroundStyle(Theme.text2)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                Image(systemName: "folder.fill").foregroundStyle(Theme.accentText)
+                Text(settings.organizeFolder.path).monospacedText(size: 11).foregroundStyle(Theme.text2)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Button(tr("Cambiar…"), action: chooseFolder).buttonStyle(AppButtonStyle(kind: .ghost, height: 26))
+                Button(tr("Ordenar ahora…")) { organizer.showWindow() }.buttonStyle(.appSecondary)
+            }
+            SwitchRow(title: tr("Ordenar automáticamente los archivos nuevos"),
+                      detail: tr("Cuando llega un archivo a esta carpeta, va a su subcarpeta. Los que ya estaban no se tocan. Los tipos son los que elijas en «Ordenar ahora…»."),
+                      isOn: $settings.autoOrganize)
+            if let last = organizer.lastBatch {
+                HStack {
+                    Text(tr("Última ordenación: %d archivos · %@", last.moves.count,
+                            last.date.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localizer.shared.locale))))
+                        .font(.system(size: 12)).foregroundStyle(Theme.text3)
+                    Spacer()
+                    Button(tr("Deshacer")) { Task { await organizer.undoLast() } }
+                        .buttonStyle(AppButtonStyle(kind: .ghost, height: 26))
+                        .disabled(organizer.working)
+                }
+            }
+        }
+        .appCard()
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.directoryURL = settings.organizeFolder
+        panel.prompt = tr("Elegir")
+        panel.message = tr("Elige la carpeta que quieres ordenar por tipo.")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        settings.organizeFolderPath = url.path
     }
 }
 

@@ -4,7 +4,7 @@ import SwiftUI
 /// Everything you can do with the files on a shelf. Shared by the shelf's "…" menu,
 /// the right-click menu and the keyboard shortcuts.
 enum ShelfAction: CaseIterable {
-    case open, quickLook, reveal, copy, copyTo, moveTo, zip, share, airDrop, newShelf, remove, trash
+    case open, quickLook, reveal, copy, copyTo, moveTo, zip, organize, share, airDrop, newShelf, remove, trash
 
     var title: String {
         switch self {
@@ -15,6 +15,7 @@ enum ShelfAction: CaseIterable {
         case .copyTo: return tr("Copiar a carpeta…")
         case .moveTo: return tr("Mover a carpeta…")
         case .zip: return tr("Comprimir en ZIP")
+        case .organize: return tr("Ordenar la carpeta por tipo…")
         case .share: return tr("Compartir…")
         case .airDrop: return tr("AirDrop…")
         case .newShelf: return tr("Pasar a una bandeja nueva")
@@ -32,6 +33,7 @@ enum ShelfAction: CaseIterable {
         case .copyTo: return "folder.badge.plus"
         case .moveTo: return "arrow.right.doc.on.clipboard"
         case .zip: return "doc.zipper"
+        case .organize: return "folder.badge.gearshape"
         case .share: return "square.and.arrow.up"
         case .airDrop: return "airplayaudio"
         case .newShelf: return "tray.2"
@@ -43,10 +45,15 @@ enum ShelfAction: CaseIterable {
     /// Menu layout; `nil` is a separator.
     static let menuLayout: [ShelfAction?] = [
         .open, .quickLook, .reveal, nil,
-        .copy, .copyTo, .moveTo, .zip, nil,
+        .copy, .copyTo, .moveTo, .zip, .organize, nil,
         .share, .airDrop, nil,
         .newShelf, .remove, .trash,
     ]
+
+    /// Only for folders: sorting their contents by kind.
+    func isAvailable(for items: [ShelfItem]) -> Bool {
+        self != .organize || items.contains { FileInfo.isFolder($0.url) }
+    }
 
     @MainActor
     func perform(on items: [ShelfItem], in shelf: Shelf) {
@@ -67,6 +74,8 @@ enum ShelfAction: CaseIterable {
             FileOps.transfer(items, in: shelf, move: self == .moveTo)
         case .zip:
             FileOps.zip(items, in: shelf)
+        case .organize:
+            if let folder = urls.first(where: FileInfo.isFolder) { Organizer.shared.showWindow(for: folder) }
         case .share:
             guard let view = shelf.panel?.contentView else { return }
             let picker = NSSharingServicePicker(items: urls)
@@ -100,6 +109,7 @@ enum ShelfAction: CaseIterable {
         let menu = NSMenu()
         for entry in menuLayout {
             guard let action = entry else { menu.addItem(.separator()); continue }
+            guard action.isAvailable(for: items) else { continue }
             let item = ClosureMenuItem(title: action.title) { action.perform(on: items, in: shelf) }
             item.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)
             menu.addItem(item)
@@ -118,14 +128,14 @@ struct ShelfMenuContent: View {
             Text(tr("%d seleccionados", targets.count))
         }
         ForEach(Array(ShelfAction.menuLayout.enumerated()), id: \.offset) { _, entry in
-            if let action = entry {
+            if let action = entry, action.isAvailable(for: targets) {
                 Button {
                     action.perform(on: targets, in: shelf)
                 } label: {
                     Label(action.title, systemImage: action.symbol)
                 }
                 .disabled(targets.isEmpty)
-            } else {
+            } else if entry == nil {
                 Divider()
             }
         }

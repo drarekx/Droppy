@@ -27,8 +27,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             .store(in: &cancellables)
 
         Shelves.shared.load()
+        Organizer.shared.load()
+        // Turning automatic sorting on (or changing its folder) only affects files that arrive from now on.
+        Settings.shared.$autoOrganize
+            .dropFirst()
+            .removeDuplicates()
+            .sink { on in
+                if on { Settings.shared.autoOrganizeSince = Date() }
+                DispatchQueue.main.async { Organizer.shared.updateWatcher() }
+            }
+            .store(in: &cancellables)
+        Settings.shared.$organizeFolderPath
+            .dropFirst()
+            .removeDuplicates()
+            .sink { _ in
+                Settings.shared.autoOrganizeSince = Date()
+                DispatchQueue.main.async { Organizer.shared.updateWatcher() }
+            }
+            .store(in: &cancellables)
         DragMonitor.shared.start()
-        HotKey.shared.action = { Shelves.shared.newShelf() }
+        HotKey.shared.action = {
+            if Settings.shared.dockEnabled { Shelves.shared.toggleDock() } else { Shelves.shared.newShelf() }
+        }
         HotKey.shared.setEnabled(Settings.shared.hotKeyEnabled)
         Settings.shared.$hotKeyEnabled
             .dropFirst()
@@ -38,6 +58,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             .dropFirst()
             .sink { Shelves.shared.setDockVisible($0) }
             .store(in: &cancellables)
+        #if DEBUG
+        // Test hook for debug builds: `notifyutil`-style distributed notifications drive the docked shelf.
+        DistributedNotificationCenter.default().addObserver(forName: Notification.Name("com.egluu.droppy.debug"),
+                                                            object: nil, queue: .main) { note in
+            MainActor.assumeIsolated {
+                switch note.object as? String {
+                case "reveal": Shelves.shared.revealDock()
+                case "sticky": Shelves.shared.revealDock(sticky: true)
+                case "collapse": Shelves.shared.docked.revealed = false
+                case "add": Shelves.shared.docked.add([URL(fileURLWithPath: NSHomeDirectory() + "/Desktop")])
+                case "floating":
+                    let urls = ["/Applications/Safari.app", "/System/Library/Desktop Pictures", "/etc/hosts"].map { URL(fileURLWithPath: $0) }
+                    Shelves.shared.newShelf(with: urls, at: NSPoint(x: 700, y: 500))
+                case "expand": Shelves.shared.open.last?.expanded.toggle()
+                case "closeall": Shelves.shared.closeAll()
+                case let command? where command.hasPrefix("organize-window:"):
+                    Organizer.shared.showWindow(for: URL(fileURLWithPath: String(command.dropFirst(16))))
+                case let command? where command.hasPrefix("organize-run:"):
+                    let folder = URL(fileURLWithPath: String(command.dropFirst(13)))
+                    let plan = Organizer.plan(folder: folder, excluded: Settings.shared.organizeExcluded)
+                    Task { await Organizer.shared.organize(plan.entries, in: folder) }
+                case "organize-undo": Task { _ = await Organizer.shared.undoLast() }
+                default: break
+                }
+            }
+        }
+        #endif
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
         Updater.shared.start()
@@ -117,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
         menu.addItem(paste)
 
         if Settings.shared.dockEnabled {
-            let dock = ClosureMenuItem(title: tr("Abrir la bandeja fija")) { shelves.revealDock() }
+            let dock = ClosureMenuItem(title: tr("Abrir la bandeja fija")) { shelves.revealDock(sticky: true) }
             dock.image = NSImage(systemSymbolName: "pin", accessibilityDescription: nil)
             menu.addItem(dock)
         }
@@ -126,6 +173,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenu
             menu.addItem(.separator())
             menu.addItem(ClosureMenuItem(title: tr("Traer bandejas al frente")) { shelves.bringAllToFront() })
             menu.addItem(ClosureMenuItem(title: tr("Cerrar todas las bandejas")) { shelves.closeAll() })
+        }
+
+        menu.addItem(.separator())
+        let organizer = Organizer.shared
+        let folderName = FileManager.default.displayName(atPath: Settings.shared.organizeFolder.path)
+        let sortFolder = ClosureMenuItem(title: tr("Ordenar %@ por tipo…", folderName)) { organizer.showWindow() }
+        sortFolder.image = NSImage(systemSymbolName: "folder.badge.gearshape", accessibilityDescription: nil)
+        menu.addItem(sortFolder)
+        menu.addItem(ClosureMenuItem(title: tr("Ordenar otra carpeta…")) { organizer.chooseFolderAndShow() })
+        if let last = organizer.lastBatch {
+            let undo = ClosureMenuItem(title: tr("Deshacer la última ordenación (%d archivos)", last.moves.count)) {
+                Task {
+                    let (_, failures) = await organizer.undoLast()
+                    if !failures.isEmpty {
+                        FileOps.alert(tr("No se pudieron mover %d archivos:", failures.count), failures.joined(separator: "\n"))
+                    }
+                }
+            }
+            undo.image = NSImage(systemSymbolName: "arrow.uturn.backward", accessibilityDescription: nil)
+            undo.isEnabled = !organizer.working
+            menu.addItem(undo)
         }
 
         let recentItem = NSMenuItem(title: tr("Bandejas recientes"), action: nil, keyEquivalent: "")

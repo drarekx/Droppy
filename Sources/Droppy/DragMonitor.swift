@@ -36,6 +36,8 @@ final class DragMonitor {
         case .leftMouseDragged:
             dragged(event)
         case .leftMouseUp:
+            // A plain click elsewhere folds the open docked shelf; a drag of files doesn't.
+            if !carriesContent { Shelves.shared.dockClickedOutside(at: NSEvent.mouseLocation) }
             reset()
         default:
             break
@@ -61,10 +63,8 @@ final class DragMonitor {
             carriesContent = true
         }
         let settings = Settings.shared
-        // Reaching the left edge of the screen opens the docked shelf (shaking still works too).
-        let mouse = NSEvent.mouseLocation
-        if settings.dockEnabled, let screen = ShelfPanel.dockScreen?.frame,
-           mouse.x <= screen.minX + 3, mouse.y >= screen.minY, mouse.y <= screen.maxY {
+        // Reaching the fixed shelf's edge, near its tab, opens it (shaking still works too).
+        if settings.dockEnabled, let zone = ShelfPanel.dockTriggerZone(), zone.contains(NSEvent.mouseLocation) {
             Shelves.shared.revealDock()
         }
         if let flag = settings.triggerModifier.flag, event.modifierFlags.contains(flag) {
@@ -92,6 +92,11 @@ final class DragMonitor {
 
     private func trigger() {
         triggered = true
-        Shelves.shared.shelfForDrag(at: NSEvent.mouseLocation)
+        // With the fixed shelf on, shaking (or the key) opens it instead of a new floating shelf.
+        if Settings.shared.dockEnabled {
+            Shelves.shared.revealDock(sticky: true)
+        } else {
+            Shelves.shared.shelfForDrag(at: NSEvent.mouseLocation)
+        }
     }
 }

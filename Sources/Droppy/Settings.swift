@@ -33,6 +33,27 @@ enum ShelfSort: String, CaseIterable, Identifiable {
     }
 }
 
+/// Screen side of the fixed shelf.
+enum DockEdge: String, CaseIterable, Identifiable {
+    case left, right
+    var id: String { rawValue }
+    var title: String { self == .left ? tr("Izquierda") : tr("Derecha") }
+}
+
+/// Where along the side the fixed shelf sits.
+enum DockAlignment: String, CaseIterable, Identifiable {
+    case top, center, bottom
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .top: return tr("Arriba")
+        case .center: return tr("Centro")
+        case .bottom: return tr("Abajo")
+        }
+    }
+}
+
 /// Key that, pressed while dragging, opens a shelf at the mouse.
 enum TriggerModifier: String, CaseIterable, Identifiable {
     case none, control, option, shift
@@ -76,10 +97,27 @@ final class Settings: ObservableObject {
     @Published var hasLaunched: Bool { didSet { defaults.set(hasLaunched, forKey: "hasLaunched") } }
     /// Fixed shelf on the left edge of the screen.
     @Published var dockEnabled: Bool { didSet { defaults.set(dockEnabled, forKey: "dockEnabled") } }
+    @Published var dockEdge: DockEdge { didSet { defaults.set(dockEdge.rawValue, forKey: "dockEdge") } }
+    @Published var dockAlignment: DockAlignment { didSet { defaults.set(dockAlignment.rawValue, forKey: "dockAlignment") } }
     @Published var sort: ShelfSort { didSet { defaults.set(sort.rawValue, forKey: "shelfSort") } }
     @Published var sortDescending: Bool { didSet { defaults.set(sortDescending, forKey: "sortDescending") } }
     /// List sections per kind of file (Images, PDFs…).
     @Published var groupByKind: Bool { didSet { defaults.set(groupByKind, forKey: "groupByKind") } }
+
+    /// Folder sorted by kind ("Sort Downloads…" and automatic sorting). Downloads by default.
+    @Published var organizeFolderPath: String { didSet { defaults.set(organizeFolderPath, forKey: "organizeFolderPath") } }
+    var organizeFolder: URL { URL(fileURLWithPath: organizeFolderPath, isDirectory: true) }
+    /// Kinds left where they are when sorting.
+    @Published var organizeExcluded: Set<OrganizeCategory> {
+        didSet { defaults.set(organizeExcluded.map(\.rawValue).sorted(), forKey: "organizeExcluded") }
+    }
+    /// Sort new files in `organizeFolder` as they arrive.
+    @Published var autoOrganize: Bool { didSet { defaults.set(autoOrganize, forKey: "autoOrganize") } }
+    /// Automatic sorting only touches files added after this (when it was turned on, or after an undo).
+    var autoOrganizeSince: Date {
+        get { defaults.object(forKey: "autoOrganizeSince") as? Date ?? Date() }
+        set { defaults.set(newValue, forKey: "autoOrganizeSince") }
+    }
 
     private init() {
         defaults.register(defaults: ["shakeEnabled": true, "hotKeyEnabled": true, "removeAfterDrag": true,
@@ -94,8 +132,14 @@ final class Settings: ObservableObject {
         keepRecent = defaults.bool(forKey: "keepRecent")
         hasLaunched = defaults.bool(forKey: "hasLaunched")
         dockEnabled = defaults.bool(forKey: "dockEnabled")
+        dockEdge = DockEdge(rawValue: defaults.string(forKey: "dockEdge") ?? "") ?? .left
+        dockAlignment = DockAlignment(rawValue: defaults.string(forKey: "dockAlignment") ?? "") ?? .center
         sort = ShelfSort(rawValue: defaults.string(forKey: "shelfSort") ?? "") ?? .added
         sortDescending = defaults.bool(forKey: "sortDescending")
         groupByKind = defaults.bool(forKey: "groupByKind")
+        let downloads = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+        organizeFolderPath = defaults.string(forKey: "organizeFolderPath") ?? downloads.path
+        organizeExcluded = Set((defaults.stringArray(forKey: "organizeExcluded") ?? []).compactMap(OrganizeCategory.init(rawValue:)))
+        autoOrganize = defaults.bool(forKey: "autoOrganize")
     }
 }
